@@ -13,6 +13,7 @@ import socket
 import signal, atexit, traceback
 import logging, logging.handlers
 import threading
+import cc1101 # add to top of file
 
 try:
     from myconfig import MyConfig
@@ -62,6 +63,9 @@ class Shutter(MyLog):
            self.TXGPIO=self.config.TXGPIO # 433.42 MHz emitter
         else:
            self.TXGPIO=4 # 433.42 MHz emitter on GPIO 4
+        
+        self.TXGPIO = 24 # assign to GPIO-24 as shown in above wiring
+
         self.frame = bytearray(7)
         self.callback = []
         self.shutterStateList = {}
@@ -324,9 +328,13 @@ class Shutter(MyLog):
 
            pi.wave_add_generic(wf)
            wid = pi.wave_create()
-           pi.wave_send_once(wid)
-           while pi.wave_tx_busy():
-              pass
+           with cc1101.CC1101() as transceiver:
+               transceiver.set_base_frequency_hertz(433.42e6)
+               transceiver._write_burst(start_register=0x3E, values=[0x0, 0x34])    
+               with transceiver.asynchronous_transmission():
+                   pi.wave_send_once(wid)
+                   while pi.wave_tx_busy():
+                       pass
            pi.wave_delete(wid)
 
            pi.stop()
